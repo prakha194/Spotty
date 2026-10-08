@@ -275,10 +275,10 @@ object CrashReporter {
         return (hasUpper && hasLower) || (hasLower && hasDigit) || (hasUpper && hasDigit)
     }
 
-    private val STORAGE_PATH = Regex("""/storage/emulated/\d+(?:/[^\s"')\]]*)?""")
-    private val DATA_USER_PATH = Regex("""/data/user/\d+/[^\s"')\]]*""")
-    private val DATA_DATA_PATH = Regex("""/data/data/[^\s"')\]]*""")
-    private val URL_REGEX = Regex("""https?://[^\s"')\]]+""")
+    private val STORAGE_PATH = Regex("""/storage/emulated/\d+(?:/[^\s"')]]*)?""")
+    private val DATA_USER_PATH = Regex("""/data/user/\d+/[^\s"')]]*""")
+    private val DATA_DATA_PATH = Regex("""/data/data/[^\s"')]]*""")
+    private val URL_REGEX = Regex("""https?://[^\s"')]]+""")
     private val EMAIL_REGEX = Regex("""[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}""")
     private val TOKEN_REGEX = Regex("""[A-Za-z0-9+/=_\-]{24,}""")
 
@@ -304,7 +304,7 @@ object CrashReporter {
             setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            setRequestProperty("User-Agent", "Meld-CrashReporter/${BuildConfig.VERSION_NAME}")
+            setRequestProperty("User-Agent", "Spotty-CrashReporter/${BuildConfig.VERSION_NAME}")
         }
         return try {
             conn.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
