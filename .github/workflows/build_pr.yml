@@ -58,7 +58,7 @@ jobs:
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
-            -dname "CN=Metrolist PR ${{ github.event.number }},O=Metrolist,C=US"
+            -dname "CN=Spotty PR ${{ github.event.number }},O=Spotty,C=US"
 
       - name: Save PR debug keystore
         if: steps.pr_keystore.outputs.cache-hit != 'true'
