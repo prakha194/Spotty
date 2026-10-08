@@ -37,7 +37,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = applicationIdOverride ?: "com.meld.app"
+        applicationId = applicationIdOverride ?: "com.spotty.app"
         minSdk = 26
         targetSdk = 36
         versionCode = 28
@@ -45,7 +45,7 @@ android {
         val baseVersionName = requireNotNull(versionName)
         buildConfigField("String", "BASE_VERSION_NAME", "\"$baseVersionName\"")
         buildCommit?.let { versionName = "$baseVersionName+$it" }
-        resValue("string", "app_name", appNameOverride ?: "Meld")
+        resValue("string", "app_name", appNameOverride ?: "Spotty")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -67,7 +67,7 @@ android {
         // and a fine-grained PAT with issues:write scoped to that repo only.
         // Both must be present at build time for reporting to be active at runtime.
         val crashRepo = localProperties.getProperty("CRASH_REPORT_REPO")
-            ?: System.getenv("CRASH_REPORT_REPO") ?: "francescograzioso/Meld"
+            ?: System.getenv("CRASH_REPORT_REPO") ?: "prakha194/Spotty"
         val crashToken = localProperties.getProperty("CRASH_REPORT_TOKEN")
             ?: System.getenv("CRASH_REPORT_TOKEN") ?: ""
         buildConfigField("String", "CRASH_REPORT_REPO", "\"$crashRepo\"")
@@ -146,7 +146,7 @@ android {
             }
             isDebuggable = true
             if (appNameOverride == null) {
-                resValue("string", "app_name", "Meld Debug")
+                resValue("string", "app_name", "Spotty Debug")
             }
             signingConfig =
                 if (workflowDebugKeystoreFile != null) {

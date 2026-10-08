@@ -1,8 +1,3 @@
-/**
- * Metrolist Project (C) 2026
- * Licensed under GPL-3.0 | See git history for contributors
- */
-
 package com.metrolist.music.utils
 
 import com.metrolist.music.BuildConfig
@@ -39,7 +34,7 @@ object Updater {
     private var cachedAllReleases: List<ReleaseInfo> = emptyList()
     
     private const val CHECK_INTERVAL_MILLIS = 2 * 60 * 60 * 1000L // 2 hours
-    private const val GITHUB_API_BASE = "https://api.github.com/repos/FrancescoGrazioso/Meld"
+    private const val GITHUB_API_BASE = "https://api.github.com/repos/prakha194/Spotty"
 
     /**
      * Compares two version strings.
@@ -96,8 +91,8 @@ object Updater {
             
             // Parse architecture and variant from filename
             val (arch, variant) = when {
-                name == "Meld.apk" -> "universal" to "foss"
-                name == "Meld-with-Google-Cast.apk" -> "universal" to "gms"
+                name == "Spotty.apk" -> "universal" to "foss"
+                name == "Spotty-with-Google-Cast.apk" -> "universal" to "gms"
                 name.startsWith("app-") && name.endsWith("-release.apk") -> {
                     val arch = name.removePrefix("app-").removeSuffix("-release.apk")
                     arch to "foss"
