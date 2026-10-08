@@ -1,275 +1,189 @@
 <div align="center">
 <img src="fastlane/metadata/android/en-US/images/icon.png" width="160" height="160" style="display: block; margin: 0 auto"/>
 <h1>Spotty</h1>
-<p>A music client that fuses Spotify and YouTube Music into one seamless experience</p>
+<p>An Android music client that fuses Spotify and YouTube Music</p>
 
 [![Latest release](https://img.shields.io/github/v/release/prakha194/Spotty?style=for-the-badge)](https://github.com/prakha194/Spotty/releases/latest)
-[![GitHub license](https://img.shields.io/github/license/prakha194/Spotty?style=for-the-badge)](https://github.com/prakha194/Spotty/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/prakha194/Spotty?style=for-the-badge)](https://github.com/prakha194/Spotty/blob/main/LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/prakha194/Spotty/total?style=for-the-badge)](https://github.com/prakha194/Spotty/releases)
 
 </div>
 
-## Attribution & License
+---
 
-Spotty is a rebranded fork of **[Meld](https://github.com/FrancescoGrazioso/Meld)**, an Android music client that fuses Spotify and YouTube Music. Meld is itself a fork of **[Metrolist](https://github.com/MetrolistGroup/Metrolist)**.
+Spotty is a Kotlin/Jetpack Compose Android app that uses your Spotify account for
+discovery (search, home, recommendations) and streams audio through YouTube Music.
+This README is written for people building, running, and contributing to the code.
+If you just want the app, grab the APK from the [releases page](https://github.com/prakha194/Spotty/releases).
 
-Both upstream projects are licensed under the **GNU General Public License v3.0**, and Spotty is distributed under the same license. The original copyright notices and the full license text are retained in [LICENSE](LICENSE). As required by the GPL, the complete source code for Spotty is available in this repository.
+## Building from source
 
-## What is Spotty?
+### Requirements
 
-**Spotty** is an Android music client that brings together the best of Spotify and YouTube Music. It uses your Spotify account to power personalized recommendations, search, and home content — while streaming audio through YouTube Music.
+- **JDK 21** (the build targets Java 21)
+- **Android SDK** — `compileSdk 37`; install via Android Studio or `sdkmanager`
+- **Git**
 
-The name "Spotty" reflects the core idea: fusing two music platforms into a single, unified listening experience.
+### Clone and configure
 
-### Why Spotty?
+```bash
+git clone https://github.com/prakha194/Spotty.git
+cd Spotty
+cp local.properties.sample local.properties   # then fill in what you need
+```
 
-- **Spotify's personalization** — Your top tracks, favorite artists, and curated playlists from Spotify drive the recommendations
-- **YouTube Music's catalog** — Access YouTube Music's vast library for streaming, including rare tracks, live performances, and remixes
-- **No setup required** — Just log in with your Spotify account directly in the app. No developer dashboard, no Client ID, no extra steps
-- **No Spotify Premium required** — Spotty uses Spotify's data APIs (not streaming), so a free Spotify account is all you need
-- **Built-in recommendation engine** — A custom algorithm builds personalized queues using your Spotify listening history, without relying on deprecated API endpoints
+`local.properties` is git-ignored. Any key you leave blank simply disables that feature
+(for example, no `LASTFM_API_KEY` means scrobbling is off).
+
+### Build
+
+```bash
+./gradlew assembleFossDebug      # default flavour, debug build
+./gradlew assembleGmsRelease     # release, with Google Cast
+./gradlew assembleIzzyRelease    # F-Droid-compliant (no Cast, no updater)
+```
+
+APKs are written to `app/build/outputs/apk/<flavour>/<type>/`. Release builds are minified
+(R8) and resource-shrunk.
+
+### Flavours
+
+| Flavour | Google Cast | In-app updater | Notes |
+|---------|-------------|----------------|-------|
+| `foss`  | no          | yes            | default |
+| `gms`   | yes         | yes            | Cast + MediaRouter |
+| `izzy`  | no          | no             | the only F-Droid-compliant build |
+
+### Signing a release
+
+The release build reads its signing config from the environment:
+`STORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, with the keystore at
+`app/keystore/release.keystore`. Locally you can also drop a keystore there and set the
+same variables.
+
+### Configuration (build-time)
+
+These environment variables (or the matching `local.properties` keys) are read at build time:
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `METROLIST_APP_NAME` | app display name | `Spotty` |
+| `METROLIST_APPLICATION_ID` | `applicationId` | `com.spotty.app` |
+| `METROLIST_BUILD_COMMIT` | commit SHA appended to the version name | — |
+| `LASTFM_API_KEY` / `LASTFM_SECRET` | Last.fm scrobbling | off |
+| `CRASH_REPORT_REPO` | `owner/repo` that receives crash reports | `prakha194/Spotty` |
+| `CRASH_REPORT_TOKEN` | token with `issues:write` on that repo | off |
+
+In CI these come from repository **secrets** and **variables** (see `.github/workflows/`).
+Without `CRASH_REPORT_TOKEN` the in-app crash reporter disables itself silently.
+
+### Tests and lint
+
+```bash
+./gradlew :app:testFossDebugUnitTest :innertube:test   # unit tests
+./gradlew :app:lintGmsRelease                          # lint on demand
+```
+
+Lint is deliberately not run on every CI build (it never gated a merge); run it locally
+before a release.
+
+## Project layout
+
+```
+app/                  the Android app — Compose UI, Media3 playback, Room, Hilt, Ktor
+innertube/            the YouTube Music (InnerTube) API client
+fastlane/             store metadata, icon and screenshots
+.github/workflows/    CI — PR builds, nightly, tagged releases
+docs/                 project site assets
+```
+
+### Architecture in brief
+
+- **Spotify** is used for data only (never audio): GraphQL for playlists, liked songs,
+  artist/album details, new releases and search, with REST fallbacks for top tracks and
+  artists. Session tokens are derived in-app from a WebView login.
+- **Playback** goes through YouTube Music via the InnerTube client. Spotify tracks are
+  matched to YouTube equivalents with fuzzy title/artist/duration matching and cached.
+- **Lossless (optional)** routes audio through Qobuz's FLAC catalogue, matched by ISRC,
+  with a silent fallback to YouTube Music when a track is missing or a resolver is down.
+- **Crash reporting** posts sanitized reports to GitHub Issues — device/app metadata and
+  stack trace only, no account, playlist or personal data.
+
+## Contributing
+
+1. Fork the repo and branch off `main`.
+2. Make your change; keep it focused and follow the existing style.
+3. Run the unit tests and lint above.
+4. Open a pull request against `main`. CI (`build_pr.yml`) builds the APK and runs tests.
+
+Keep `main` compiling — the nightly workflow builds from it. Releases are cut by bumping
+`versionName`/`versionCode` in `app/build.gradle.kts`, which triggers `release.yml`.
 
 ## Features
 
-### Spotify Integration
-- **Spotify as search source** — Search results powered by Spotify, with automatic YouTube Music matching for playback
-- **Spotify as home source** — Home screen populated with your Spotify top tracks, top artists, playlists, and new releases
-- **Spotify-only mode** — Option to hide all YouTube-based content and show exclusively Spotify-powered sections on the home screen
-- **Smart queue generation** — Custom recommendation engine that builds radio-like queues from your Spotify taste profile (top tracks/artists across 3 time ranges, genre similarity, popularity matching)
-- **Spotify library sync** — Access your Spotify playlists and liked songs directly in the app
-- **Spotify-to-YouTube matching** — Fuzzy matching algorithm with local caching for fast, accurate track resolution
-- **Manual match override** — If a Spotify track is matched to the wrong YouTube video, you can manually fix it by pasting the correct YouTube link. The override is saved permanently and takes priority over automatic matching
-- **Spotify album browsing** — Dedicated album screen for Spotify albums with full tracklist, metadata, and one-tap playback
-- **Hybrid profile cache** — 3-tier data strategy (GraphQL → REST API → local DB) with persistent caching for instant home screen loading on app restart, automatic rate-limit handling, and parallel artist image enrichment
-- **Artist navigation** — Tap any Spotify artist on the home screen to navigate directly to their YouTube Music artist page
+**Spotify integration** — Spotify as search and/or home source, a Spotify-only mode, a
+recommendation engine that builds radio-like queues from your taste profile, library sync,
+fuzzy Spotify→YouTube matching with manual override, album browsing, and a 3-tier profile
+cache (GraphQL → REST → local DB) for instant home-screen loads.
 
-### Lossless Audio (Experimental)
-- **Qobuz backend** — Optional FLAC and Hi-Res (up to 24-bit / 192 kHz) streaming via the Qobuz catalog, replacing YouTube Music's lossy audio
-- **Deterministic matching** — Uses ISRC (the universal track identifier shared by Spotify and Qobuz) so Spotify-sourced tracks resolve to their exact Qobuz counterpart without ambiguity
-- **Persistent match cache** — Once a track has been resolved on Qobuz, the match is saved locally so subsequent plays skip the search step entirely
-- **Multi-backend fallback** — Three independent Qobuz resolvers (Monokenny, Jumo, Squid) are tried in sequence if the primary one is rate-limited or unavailable
-- **Quality tiers** — Choose between AAC 320 kbps, CD quality (16-bit / 44.1 kHz), or Hi-Res (up to 24-bit / 192 kHz) per your preference and connection
-- **Automatic YouTube fallback** — If a track isn't on Qobuz, or all resolvers fail, playback falls back silently to the standard YouTube Music stream — no error, no skip
-- **Hidden behind a toggle** — Disabled by default; opt-in from the Spotify integration settings
+**Lossless audio (experimental)** — optional Qobuz FLAC/Hi-Res streaming with ISRC-matched
+tracks, persistent match caching, three independent community resolvers, quality tiers
+(AAC 320 / CD / Hi-Res) and automatic YouTube fallback.
 
-### Core Music Features
-- Play any song or video from YouTube Music
-- Background playback
-- Personalized quick picks
-- Library management
-- Listen together with friends
-- Download and cache songs for offline playback
-- Search for songs, albums, artists, videos and playlists
-- Live lyrics
-- YouTube Music account login support
-- Syncing of songs, artists, albums and playlists, from and to your account
-- Skip silence
-- Import playlists
-- Audio normalization
-- Adjust tempo/pitch
-- Local playlist management
-- Reorder songs in playlist or queue
-- Home screen widget with playback controls
-- Light / Dark / Black / Dynamic theme
-- Sleep timer
-- Material 3 design
-- Discord Rich Presence
-
-## Download
-
-<div align="center">
-<a href="https://github.com/prakha194/Spotty/releases/latest/download/Spotty.apk"><img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Get it on GitHub" height="82"></a>
-</div>
-
-> **First time here?** Tap the badge above or go to the [Releases page](https://github.com/prakha194/Spotty/releases), then download the **Spotty.apk** file and open it on your Android device. You may need to allow installation from unknown sources in your phone's settings.
-
-<div align="center">
-
-**Enjoying Spotty?** Star the repo and share it with a friend.
-
-</div>
-
-## How the Spotify Integration Works
-
-Spotty connects to your Spotify account through a built-in WebView login — no developer setup or Client ID required. Here's what happens under the hood:
-
-1. **Authentication** — You log in with your regular Spotify credentials (email, Google, Facebook, or Apple) directly inside the app. Spotty extracts session cookies and generates access tokens using TOTP, keeping you logged in without manual token management.
-2. **Data layer** — Spotty communicates with Spotify primarily through GraphQL endpoints (for playlists, liked songs, artist details, albums, new releases, and search) with REST API fallbacks for top tracks and top artists. GraphQL avoids the aggressive rate limits that affect REST endpoints.
-3. **Home screen** — When "Use Spotify for Home" is enabled, Spotty builds a personalized home feed from your top tracks, top artists, playlists, and new releases. Enable "Spotify only" to hide all YouTube-based sections for a fully Spotify-driven experience.
-4. **Profile caching** — Your Spotify profile data (top tracks, top artists with images) is persisted locally and served instantly on app restart. Background network refreshes only happen when the cache is stale (6-hour TTL), keeping the home screen fast and responsive.
-5. **Search** — When "Use Spotify for Search" is enabled, search queries go through Spotify's GraphQL search. Results are displayed as Spotify content; tapping a song resolves it to YouTube Music for playback.
-6. **Queue generation** — When you play a Spotify-sourced song, Spotty's recommendation engine builds a queue by:
-   - Fetching top tracks from the song's artists
-   - Finding genre-similar artists from your taste profile
-   - Mixing in tracks from your personal top tracks pool
-   - Scoring candidates by artist affinity (30%), genre overlap (20%), source relevance (25%), recency (15%), and popularity similarity (10%)
-   - Diversifying the queue to avoid repetition (max 3 tracks per artist)
-7. **Playback** — Each Spotify track is matched to its YouTube Music equivalent using fuzzy title/artist/duration matching, then streamed via YouTube Music's infrastructure. Matched results are cached locally for instant resolution on subsequent plays. If a match is wrong, you can manually override it from the player's three-dot menu → "Change YouTube version" by pasting the correct YouTube link.
-
-## How the Qobuz Lossless Integration Works
-
-When the Qobuz toggle is enabled (Settings → Integrations → Spotify → "Use Qobuz for lossless playback"), Spotty routes audio through Qobuz's FLAC catalog instead of YouTube Music's lossy AAC streams. The integration is fully opt-in and falls back to YouTube Music whenever Qobuz can't deliver — there's no playback interruption either way.
-
-1. **Match resolution** — For every track about to play, Spotty looks up the song on Qobuz. Spotify-sourced tracks include the **ISRC** (the universal track identifier — the same ISRC points to the same recording across Spotify, Qobuz, Tidal, etc.) which produces an exact, deterministic match. YT-native tracks fall back to fuzzy title/artist/album matching using the cached song metadata.
-2. **Backend cycling** — Qobuz is accessed through three independent open community resolvers (Monokenny, Jumo, Squid). The primary backend is configurable; if it returns a preview, captcha challenge, or any other failure, Spotty automatically retries on the alternates before giving up. Backends that hit a captcha are skipped for five minutes to avoid wasted retries.
-3. **Persistent caching** — A successful match (the Qobuz track ID, hi-res tier, bit depth, sample rate) is saved in the local database keyed by the YouTube ID, so the next play of the same song skips the search step entirely and resolves in a few hundred milliseconds. ISRCs discovered during a Qobuz resolve are also written back to the song's row, which improves the accuracy of future matches across the whole library.
-4. **Quality tier downgrade** — When the saved match knows the track only exists at CD quality on Qobuz (not Hi-Res), Spotty caps the requested quality automatically to avoid the wasted "preview returned" round-trip.
-5. **YouTube fallback** — If every Qobuz backend fails (track not in catalog, all resolvers down, network issue, etc.), playback proceeds through the standard YouTube Music pipeline with the lossy AAC stream. The fallback is silent and instant; subsequent plays will try Qobuz again.
-
-> **Important — third-party services:** The Qobuz resolvers are run by independent community projects, not by us. They may go down, get rate-limited, or stop working at any time without notice. When they do, playback automatically falls back to YouTube Music — but you may notice slower start times during the failed Qobuz attempt.
-
-> **Bandwidth and storage:** FLAC streams use 3–10× more data than the standard AAC. Hi-Res (24-bit / 96+ kHz) can exceed 1.5 Mbit/s and use ~30 MB per song downloaded. Consider this if you're on a limited mobile plan or have tight storage.
-
-## Setup
-
-### Spotify Integration
-
-1. In Spotty, go to **Settings → Integrations → Spotify**
-2. Tap **Login** — a Spotify login page will open directly inside the app
-3. Sign in with your Spotify account (email/password, Google, Facebook, or Apple)
-4. Once logged in, enable **"Use Spotify for Search"** and/or **"Use Spotify for Home"** — these are off by default
-5. Optionally enable **"Spotify only"** to hide all YouTube-based content from the home screen
-6. Go back to the home screen and **pull down to refresh**. Your Spotify playlists, top tracks, and recommendations should appear within a few seconds.
-
-> **Note:** No developer account, Client ID, or any external setup is required. Just log in with your regular Spotify account — free or Premium.
-
-> **Important:** For reliable playback, disable battery optimization for Spotty in your phone settings (**Settings → Apps → Spotty → Battery → Unrestricted**). Without this, Android may throttle the app and cause long delays before songs start playing.
-
-### Qobuz Lossless (Optional)
-
-1. Make sure Spotify integration is set up first (see above) — Qobuz lives under the same settings screen
-2. Scroll to the **"Audio quality (experimental)"** section at the bottom of **Settings → Integrations → Spotify**
-3. Enable **"Use Qobuz for lossless playback"**
-4. Pick a **quality tier** — AAC 320, CD (recommended default), or Hi-Res
-5. Pick a **resolver backend** — Monokenny is the recommended default; Jumo and Squid are alternates that the app also rotates through automatically on failure
-6. Set the **country code** (ISO two-letter, e.g. `US`, `IT`, `FR`) — this affects which regional Qobuz catalog is queried
-
-That's it — the next time you play a song, Spotty will try Qobuz first and fall back to YouTube Music if the track isn't available there. The toggle can be turned off at any time to revert to YouTube-only playback.
-
-> **Hot-reload:** Toggling Qobuz on/off, switching backend, quality, or country code automatically reloads the currently playing track so the new source takes effect immediately. **No app restart is required.**
-
-### Building from source
-
-For GitHub Actions builds, add these secrets to your repository:
-- `LASTFM_API_KEY` / `LASTFM_SECRET` — from [last.fm/api/account/create](https://www.last.fm/api/account/create)
+**Core player** — background playback, offline downloads and caching, live and synced
+lyrics (multiple providers, romanization, AI translation), Listen Together, playlists
+(local, YouTube-synced, import/export), home-screen widgets, sleep timer and alarm,
+Discord Rich Presence, SponsorBlock, skip-silence, crossfade, equalizer (incl. AutoEQ),
+Material 3 theming with dynamic colours, and more.
 
 ## FAQ
 
-### Q: How do I download and install Spotty?
+**Do I need Spotify Premium?** No. Spotty uses Spotify for data only; audio streams from
+YouTube Music. A free Spotify account is enough.
 
-Go to the [latest release](https://github.com/prakha194/Spotty/releases/latest) and download the **Spotty.apk** file. Open it on your Android device — you may need to allow "Install from unknown sources" in your phone's settings when prompted. You do **not** need to download the source code files.
+**How do I install it?** Download `Spotty.apk` from the [latest release](https://github.com/prakha194/Spotty/releases/latest)
+and open it on your device (allow install from unknown sources). GitHub is the only
+supported source — APKs elsewhere are not ours.
 
-### Q: I saw a Spotty APK on a third-party website, is it safe?
+**My playlists aren't showing after Spotify login.** Enable "Use Spotify for Home" and/or
+"Use Spotify for Search" in Settings → Integrations → Spotify, then pull down to refresh.
 
-No, GitHub is the only place officially supported for Spotty releases. Any other place is not official and thus can be dangerous.
+**Playback is slow to start.** Disable battery optimization for Spotty
+(Settings → Apps → Spotty → Battery → Unrestricted) — this is the usual fix.
 
-### Q: I saw Spotty flagged by Malwarebytes or another antivirus, is it infected?
+**Can my account get banned?** Spotify is used read-only; no streaming, no artificial
+plays. Using unofficial clients sits outside Spotify's ToS, so the risk is low but
+non-zero. YouTube streaming uses the InnerTube API; avoid logging in with Google unless
+you need age-restricted content. Use at your own risk.
 
-No, it's a false positive. Spotty is a fork of [Meld](https://github.com/FrancescoGrazioso/Meld), which is based on [Metrolist](https://github.com/metrolistgroup/metrolist) — the same false positive has been reported for both. Spotty, Meld and Metrolist are all fully open-source projects using the GPL-3.0 license, with the entire source code accessible through [GitHub](https://github.com/prakha194/Spotty).
+**I have a bug or feature request.** Open an issue on the
+[GitHub repository](https://github.com/prakha194/Spotty/issues) so it can be tracked.
 
-### Q: Is there a Spotty PC app? When will it release?
+## Attribution & License
 
-Not yet, but it is in the works and should release soon. No date is set in stone, but we estimate the release to be before the end of this year. (So if you ask "Spotty PC?", the current answer is NO, but it's coming!)
+Spotty is a rebranded fork of **[Meld](https://github.com/FrancescoGrazioso/Meld)** by
+[Francesco Grazioso](https://github.com/FrancescoGrazioso), which is itself a fork of
+**[Metrolist](https://github.com/MetrolistGroup/Metrolist)** by
+[Mo Agamy](https://github.com/mostafaalagamy). Spotty is maintained by
+[prakha194](https://github.com/prakha194).
 
-### Q: I logged into Spotify but my playlists aren't showing
+All three are licensed under the **GNU General Public License v3.0**, and Spotty is
+distributed under the same license. The original copyright notices and full license text
+are retained in [LICENSE](LICENSE). As the GPL requires, the complete source for Spotty is
+available in this repository.
 
-After logging in, make sure you've enabled **"Use Spotify for Home"** and/or **"Use Spotify for Search"** in **Settings → Integrations → Spotify**. These are off by default. Then go back to the home screen and **pull down to refresh**. The first load may take a few seconds; subsequent launches will be instant thanks to local caching.
-
-### Q: Songs aren't playing / playback is very slow to start
-
-If songs aren't playing or take a long time to start, try the following possible fixes:
-
-1. **Disable battery optimization for Spotty** — Go to your phone's **Settings → Apps → Spotty → Battery → Unrestricted** (or "No restrictions"). This is the most common fix. Android aggressively throttles background network and CPU usage for battery-optimized apps.
-2. Go to **Settings → Player → Audio Quality** → set to low, wait a few seconds, then set to high.
-3. Force stop the app, clear the cache, then open it again.
-4. Log out of your Google account, then log back in again.
-5. Wait a moment — the first playback after a fresh launch requires initializing the streaming engine. Subsequent plays are much faster.
-6. Check your internet connection.
-
-In general, the first time you play a song it's normal for it to take a longer time (downloading metadata, YouTube matching). From the second time it will be stored in a local DB and this process won't be needed. If it's still broken, go to the support channel.
-
-### Q: Does Spotty work with Bluetooth headphones / AirPods?
-
-Yes. Spotty streams audio through YouTube Music's infrastructure like any other music player. It works with any audio output device including Bluetooth headphones, AirPods, car stereos, and speakers.
-
-### Q: Why isn't Spotty showing in Android Auto?
-
-1. Go to Android Auto's settings and tap multiple times on the version in the bottom to enable developer settings
-2. In the three dots menu at the top-right of the screen, click "Developer settings"
-3. Enable "Unknown sources"
-
-### Q: Do I need Spotify Premium?
-
-No. Spotty uses Spotify for data only (your library, top tracks, search results) — not for audio streaming. Audio is streamed through YouTube Music. A free Spotify account works perfectly.
-
-### Q: Some songs won't play — I get a playback error or age/country restriction
-
-This is a YouTube Music limitation and Spotty can't do anything about it directly. Certain tracks on YouTube may be age-restricted or region-locked. If you're not logged into YouTube, some of these tracks cannot be played because YouTube requires authentication. To fix this:
-
-1. Go to **Settings → Account** and log in with your YouTube / Google account
-2. Go back and try playing the song again
-
-If the track still doesn't play after logging in, it may be restricted in your country or permanently unavailable.
-
-### Q: I get the wrong song, a cover, or just want to change the song version (matching issues)
-
-The Spotify-to-YouTube matching uses fuzzy matching. You can manually fix an incorrect match:
-
-1. Play the song that has the wrong match
-2. Tap the **three-dot menu (⋮)** at the bottom-right of the Now Playing screen
-3. Tap **"Change YouTube version"** (this option only appears for Spotify-sourced tracks)
-4. Paste the correct YouTube or YouTube Music link in the input field
-5. A preview of the new match will appear — verify it's the right one and tap **OK**
-6. The player will automatically switch to the new version
-
-*P.S. This does not work if you have Qobuz enabled.*
-
-### Q: How does Qobuz lossless playback work?
-
-When enabled, Spotty looks up each track on Qobuz and streams the FLAC file directly. Spotify-sourced tracks are matched via ISRC (the universal track identifier) for an exact match; YouTube-native tracks fall back to fuzzy title/artist matching. If the track isn't on Qobuz, or all backend resolvers are temporarily down, playback falls back silently to the standard YouTube Music stream.
-
-The Qobuz resolvers are run by independent community projects — they're not affiliated with us. They can go down or get rate-limited at any time. When that happens, the fallback to YouTube Music is automatic and instant, but you may notice a delay on the first attempt while the failed resolvers are skipped.
-
-Also note that FLAC streams use 3–10× more data than the standard AAC. Hi-Res files can exceed 30 MB per song. If you're on a metered mobile plan or tight on storage, stick to CD quality or keep the feature off on cellular.
-
-### Q: Why did some songs play in lossless and others didn't?
-
-Not every track exists on Qobuz, and not every track exists at every quality tier. If Qobuz returns only a preview (no full stream available) or all resolvers fail, Spotty falls back to YouTube Music silently and remembers the result. Less popular tracks, indie releases, and rare regional versions are the most common cases. The fallback is the intended behavior and the audio will keep playing — just not in FLAC for that specific track.
-
-### Q: Can my Spotify or YouTube account get banned?
-
-**Spotify:** Spotty uses Spotify's APIs in read-only mode to access your library, playlists, and recommendations. It does **not** stream audio from Spotify, generate artificial plays, or modify your account data. While using unofficial API clients technically falls outside Spotify's Terms of Service, the risk of account action is considered low — similar apps have operated for years without widespread bans. That said, **use Spotty at your own risk** and consider using a secondary Spotify account if you're concerned.
-
-**YouTube/Google:** Audio is streamed through YouTube Music's infrastructure using the InnerTube API. Google has historically been more aggressive with unofficial clients. To minimize risk:
-- Avoid logging into your Google account in Spotty unless needed for age-restricted content
-- Using Spotty without a Google login carries minimal risk to your Google account
-- If you do log in, be aware this carries a small but nonzero risk
-
-**Bottom line:** No bans have been reported by Spotty users to date. However, as with any third-party client, we cannot guarantee that platform policies won't change in the future.
-
-### Q: I have a feature request or found a bug
-
-Please open an issue on the [GitHub repository](https://github.com/prakha194/Spotty/issues) so it can be tracked. Spotty is a small volunteer project, so replies may take a little time — thanks for your patience.
-
-## Credits
-
-Spotty is a rebranded fork of [**Meld**](https://github.com/FrancescoGrazioso/Meld) by [Francesco Grazioso](https://github.com/FrancescoGrazioso), which is itself a fork of [**Metrolist**](https://github.com/MetrolistGroup/Metrolist), originally created by [Mo Agamy](https://github.com/mostafaalagamy). Spotty is maintained by [prakha194](https://github.com/prakha194).
-
-### Upstream Projects
+### Credits
 
 - **InnerTune** — [Zion Huang](https://github.com/z-huang) · [Malopieds](https://github.com/Malopieds)
 - **OuterTune** — [Davide Garberi](https://github.com/DD3Boh) · [Michael Zh](https://github.com/mikooomich)
-
-### Libraries and Integrations
-
-- [**Kizzy**](https://github.com/dead8309/Kizzy) — Discord Rich Presence implementation
-- [**Better Lyrics**](https://better-lyrics.boidu.dev) — Time-synced lyrics with word-by-word highlighting
-- [**SimpMusic Lyrics**](https://github.com/maxrave-dev/SimpMusic) — Lyrics data through the SimpMusic Lyrics API
-- [**metroserver**](https://github.com/MetrolistGroup/metroserver) — Listen Together implementation
-- [**MusicRecognizer**](https://github.com/aleksey-saenko/MusicRecognizer) — Music recognition and Shazam API integration
+- [**Kizzy**](https://github.com/dead8309/Kizzy) — Discord Rich Presence
+- [**Better Lyrics**](https://better-lyrics.boidu.dev) — time-synced lyrics
+- [**SimpMusic Lyrics**](https://github.com/maxrave-dev/SimpMusic) — lyrics API
+- [**metroserver**](https://github.com/MetrolistGroup/metroserver) — Listen Together
+- [**MusicRecognizer**](https://github.com/aleksey-saenko/MusicRecognizer) — music recognition
 
 ## Disclaimer
 
-This project and its contents are not affiliated with, funded, authorized, endorsed by, or in any way associated with YouTube, Google LLC, Spotify AB, or any of their affiliates and subsidiaries.
-
-Any trademark, service mark, trade name, or other intellectual property rights used in this project are owned by the respective owners.
+This project is not affiliated with, funded, authorized, endorsed by, or in any way
+associated with YouTube, Google LLC, Spotify AB, or any of their affiliates. Any
+trademarks used belong to their respective owners.
